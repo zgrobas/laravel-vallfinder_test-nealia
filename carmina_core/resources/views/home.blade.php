@@ -918,7 +918,13 @@
                                 closeButton: false,
                                 closeOnClick: false
                             }).setContent('<div class="popup-content-wrapper" id="'+element.id_cliente+'"></div>');
-                            el.bindPopup(popup).on("click", fitBoundsPadding, options);
+                            el.bindPopup(popup);
+                            el.on("click", function(e) {
+                                // Prevenir que el popup se abra automáticamente
+                                e.target.closePopup();
+                                // Llamar a la función de animación con el contexto correcto
+                                fitBoundsPadding.call(options, e);
+                            });
                             cluster.addLayer(el);
                             markers.push(el);
                             // estructura[element.id_empresa][1][element.tipocliente].addLayer(el);
@@ -984,7 +990,7 @@
 
         return icon;
     }
-    function ubicarCliente(el){
+    async function ubicarCliente(el){
         let id_cliente = $(el).data('id');
         let id_emp = $(el).data('id_empresa');
         let emp = $(el).data('emp');
@@ -992,9 +998,13 @@
         let nombre = $(el).data('nombre');
         mark = markers.find((m => m.options.ic == id_cliente ));
         let id = mark._leaflet_id;
+
+        console.log('ubicarCliente llamado para cliente:', id_cliente);
+
         $('html, body').animate({
             scrollTop: $("#map").offset().top
         }, 300);
+
         cluster.eachLayer(function (layer){
             if(layer.options && layer._leaflet_id === id){
                 centerMarker(layer, id_cliente, id_emp, emp, direccion, nombre);
@@ -1052,14 +1062,10 @@
 
     // function open popup and centering
     // the map on the marker
-    function centerMarker(layer, id_cliente, id_emp, emp, direccion, nombre) {
-        // layer.openPopup();
-        cluster.zoomToShowLayer(layer, null);
-        layer._icon.classList.add('animation')
-        layer.openPopup();
-        updateSheetHeight(40);
-        loadPopUp(id_cliente, id_emp, emp, direccion, nombre);
-
+    async function centerMarker(layer, id_cliente, id_emp, emp, direccion, nombre) {
+        console.log('centerMarker llamado');
+        // Usar la animación en lugar de zoomToShowLayer directo
+        await animateMarkerTransition(layer, id_cliente, id_emp, emp, direccion, nombre);
     }
 
     const mediaQueryList = window.matchMedia("(min-width: 700px)");
@@ -1197,19 +1203,50 @@
         }
     }
 
-    function fitBoundsPadding(e) {
+    async function fitBoundsPadding(e) {
         if(document.getElementById(this.id).hasChildNodes()){
             map.closePopup();
             $('#familias').css('z-index','1');
-        }else{
+        } else {
             var id_emp = this.id_empresa;
             var nombre = this.nombre;
             var direccion = this.dir;
             var emp = this.emp;
             var id = this.id;
-            loadPopUp(id, id_emp, emp, direccion, nombre);
-            map.panTo(L.latLng(e.latlng));
-            e.target._icon.classList.add('animation')
+
+            console.log('=== CLICK EN MARCADOR ===');
+
+            // Remover animación del marcador anterior
+            removeAllAnimationClassFromMap();
+
+            const transitionZoom = 6;
+            const finalZoom = 15;
+            const targetLatLng = e.target.getLatLng();
+
+            try {
+                // Paso 1: Zoom out
+                console.log('Paso 1: Zoom out');
+                await smoothZoomLeaflet(map, transitionZoom, 80);
+
+                // Paso 2: Paneo
+                console.log('Paso 2: Paneo');
+                await smoothPanLeaflet(map, targetLatLng, 20, 50);
+
+                // Paso 3: Zoom in
+                console.log('Paso 3: Zoom in');
+                await smoothZoomLeaflet(map, finalZoom, 80);
+
+                // Paso 4: Mostrar popup y animación
+                console.log('Paso 4: Mostrando popup');
+                e.target._icon.classList.add('animation');
+                e.target.openPopup(); // ← Abrir el popup MANUALMENTE aquí
+                loadPopUp(id, id_emp, emp, direccion, nombre);
+                // NO usar map.panTo aquí, ya hicimos el paneo arriba
+
+                console.log('=== CLICK COMPLETADO ===');
+            } catch (error) {
+                console.error('Error en animación click:', error);
+            }
         }
     }
 
@@ -1245,6 +1282,116 @@
             document.getElementById("familias").style.left= "";
         }
     }
+
+    // ========== FUNCIONES DE ANIMACIÓN PARA LEAFLET ==========
+
+    // Función principal de animación con zoom out/in
+    async function animateMarkerTransition(layer, id_cliente, id_emp, emp, direccion, nombre) {
+        const transitionZoom = 12; // Zoom alejado para transición
+        const finalZoom = 15; // Zoom final
+
+        console.log('=== INICIANDO TRANSICIÓN LEAFLET ===');
+
+        // Remover animación del marcador anterior
+        removeAllAnimationClassFromMap();
+
+        try {
+            // Paso 1: Zoom out suave
+            console.log('Paso 1: Zoom out');
+            await smoothZoomLeaflet(map, transitionZoom, 80);
+
+            // Paso 2: Mover al nuevo punto
+            console.log('Paso 2: Paneo');
+            const targetLatLng = layer.getLatLng();
+            await smoothPanLeaflet(map, targetLatLng, 20, 50);
+
+            // Paso 3: Zoom in suave
+            console.log('Paso 3: Zoom in');
+            await smoothZoomLeaflet(map, finalZoom, 80);
+
+            // Paso 4: Mostrar popup y animación
+            console.log('Paso 4: Mostrando popup');
+            layer._icon.classList.add('animation');
+            layer.openPopup();
+            updateSheetHeight(40);
+            loadPopUp(id_cliente, id_emp, emp, direccion, nombre);
+
+            console.log('=== TRANSICIÓN COMPLETADA ===');
+        } catch (error) {
+            console.error('Error en animación:', error);
+        }
+    }
+
+    // Zoom suave por pasos para Leaflet
+    function smoothZoomLeaflet(map, targetZoom, stepDelay = 60) {
+        return new Promise((resolve) => {
+            const currentZoom = map.getZoom();
+            const step = currentZoom < targetZoom ? 0.3 : -0.3;
+            let zoom = currentZoom;
+
+            console.log(`Zoom Leaflet de ${currentZoom} a ${targetZoom}`);
+
+            function nextStep() {
+                const remaining = Math.abs(targetZoom - zoom);
+
+                if (remaining < Math.abs(step)) {
+                    map.setZoom(targetZoom);
+                    console.log('Zoom completado');
+                    resolve();
+                    return;
+                }
+
+                zoom += step;
+                map.setZoom(zoom);
+
+                setTimeout(nextStep, stepDelay);
+            }
+
+            nextStep();
+        });
+    }
+
+    // Paneo suave por pasos para Leaflet
+    function smoothPanLeaflet(map, targetLatLng, steps = 25, stepDelay = 40) {
+        return new Promise((resolve) => {
+            const startLatLng = map.getCenter();
+            const latDiff = targetLatLng.lat - startLatLng.lat;
+            const lngDiff = targetLatLng.lng - startLatLng.lng;
+
+            let currentStep = 0;
+
+            console.log(`Pan Leaflet en ${steps} pasos`);
+
+            function nextStep() {
+                if (currentStep >= steps) {
+                    map.panTo(targetLatLng, { animate: false });
+                    console.log('Pan completado');
+                    resolve();
+                    return;
+                }
+
+                currentStep++;
+
+                // Easing para suavidad
+                const progress = currentStep / steps;
+                const easeProgress = progress < 0.5
+                    ? 2 * progress * progress
+                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+                const newLat = startLatLng.lat + (latDiff * easeProgress);
+                const newLng = startLatLng.lng + (lngDiff * easeProgress);
+
+                map.panTo([newLat, newLng], { animate: false });
+
+                setTimeout(nextStep, stepDelay);
+            }
+
+            nextStep();
+        });
+    }
+
+    // ========== FIN FUNCIONES DE ANIMACIÓN ==========
+
 </script>
 @endpush
 @endsection

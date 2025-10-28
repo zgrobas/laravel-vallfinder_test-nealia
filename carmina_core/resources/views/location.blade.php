@@ -827,7 +827,7 @@
 <script src="{{ asset('build/assets/datatables.min.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-    (g => {var h, a, k, p = "The Google Maps JavaScript API",c = "google",l = "importLibrary",q = "__ib__",m = document,b = window;b = b[c] || (b[c] = {});var d = b.maps || (b.maps = {}),r = new Set,e = new URLSearchParams,u = () => h || (h = new Promise(async (f, n) => {await (a = m.createElement("script"));e.set("libraries", [...r] + "");for (k in g) e.set(k.replace(/[A-Z]/g, t => "_" + t[0].toLowerCase()), g[k]);e.set("callback", c + ".maps." + q);a.src = `https://maps.${c}apis.com/maps/api/js?` + e;d[q] = f;a.onerror = () => h = n(Error(p + " could not load."));a.nonce = m.querySelector("script[nonce]")?.nonce || "";m.head.append(a)}));d[l] ? console.warn(p + " only loads once. Ignoring:", g) : d[l] = (f, ...n) => r.add(f) && u().then(() =>d[l](f, ...n))})({key: "AIzaSyBhZrCRmu3o1CQ4w7dIo6SC_41BYgaeFfM",v: "weekly"});
+    (g => {var h, a, k, p = "The Google Maps JavaScript API",c = "google",l = "importLibrary",q = "__ib__",m = document,b = window;b = b[c] || (b[c] = {});var d = b.maps || (b.maps = {}),r = new Set,e = new URLSearchParams,u = () => h || (h = new Promise(async (f, n) => {await (a = m.createElement("script"));e.set("libraries", [...r] + "");for (k in g) e.set(k.replace(/[A-Z]/g, t => "_" + t[0].toLowerCase()), g[k]);e.set("callback", c + ".maps." + q);a.src = `https://maps.${c}apis.com/maps/api/js?` + e;d[q] = f;a.onerror = () => h = n(Error(p + " could not load."));a.nonce = m.querySelector("script[nonce]")?.nonce || "";m.head.append(a)}));d[l] ? console.warn(p + " only loads once. Ignoring:", g) : d[l] = (f, ...n) => r.add(f) && u().then(() =>d[l](f, ...n))})({key: "AIzaSyBhZrCRmu3o1CQ4w7dIo6SC_41BYgaeFfM",v: "weekly",libraries: ["geometry"]});
 </script>
 <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 <script>
@@ -1158,19 +1158,22 @@
                 });
                 AdvancedMarkerElement.info = element;
                 AdvancedMarkerElement.addListener("click", () => {
-                    const pos = {
-                        lat: +element.latitud,
-                        lng: +element.longitud,
-                    };
-                    map.setCenter(pos);
-                    map.setZoom(17);
+                    // Remover animación del marcador anterior
                     if (currentMarkerAnimated !== undefined) {
                         currentMarkerAnimated.content.classList.remove("animation");
                     }
-                    loadPopUp(element.id_cliente, element.id_empresa, element.Empresa, element
-                        .direccion, element.nombre, element.familia);
-                    AdvancedMarkerElement.content.classList.add("animation")
-                    currentMarkerAnimated = AdvancedMarkerElement;
+
+                    // Animar la transición con zoom
+                    animateMarkerTransition(AdvancedMarkerElement, () => {
+                        // Después de la animación, aplicar la clase y cargar el popup
+                        currentMarkerAnimated = AdvancedMarkerElement;
+                        AdvancedMarkerElement.content.classList.add("animation");
+
+                        requestAnimationFrame(() => {
+                            loadPopUp(element.id_cliente, element.id_empresa, element.Empresa,
+                                    element.direccion, element.nombre, element.familia);
+                        });
+                    });
                 });
                 return AdvancedMarkerElement;
             });
@@ -1603,43 +1606,35 @@
         }, intervalTime * 1000);
     }
 
-    function ubicarCliente(el) {
-        let id_cliente = $(el).data('id');
-        let id_emp = $(el).data('id_empresa');
-        let emp = $(el).data('emp');
-        let direccion = $(el).data('dir');
-        let nombre = $(el).data('nombre');
-        mark = paintedMarkers.find((m => m.info.id_cliente == id_cliente));
-
-        const pos = {
-            lat: +mark.info.latitud,
-            lng: +mark.info.longitud,
-        };
-        map.setCenter(pos);
-        map.setZoom(17);
-        if (currentMarkerAnimated !== undefined) {
-            currentMarkerAnimated.content.classList.remove("animation");
-        }
-        currentMarkerAnimated = mark;
-        mark.content.classList.add("animation")
-        loadPopUp(mark.info.id_cliente, mark.info.id_empresa, mark.info.Empresa, mark.info.direccion, mark.info.nombre, mark.info.familia);
-    }
-
     function ubicarClienteDatos(id_cliente){
         mark = paintedMarkers.find((m => m.info.id_cliente == id_cliente));
 
-        const pos = {
-            lat: +mark.info.latitud,
-            lng: +mark.info.longitud,
-        };
-        map.setCenter(pos);
-        map.setZoom(17);
         if (currentMarkerAnimated !== undefined) {
             currentMarkerAnimated.content.classList.remove("animation");
         }
+
         currentMarkerAnimated = mark;
-        mark.content.classList.add("animation")
-        loadPopUp(mark.info.id_cliente, mark.info.id_empresa, mark.info.Empresa, mark.info.direccion, mark.info.nombre, mark.info.familia);
+
+        // Usar la versión optimizada
+        animateMarkerTransition(mark, () => {
+            mark.content.classList.add("animation");
+        });
+    }
+
+    function ubicarCliente(el) {
+        let id_cliente = $(el).data('id');
+        mark = paintedMarkers.find((m => m.info.id_cliente == id_cliente));
+
+        if (currentMarkerAnimated !== undefined) {
+            currentMarkerAnimated.content.classList.remove("animation");
+        }
+
+        currentMarkerAnimated = mark;
+
+        // Usar la versión optimizada
+        animateMarkerTransition(mark, () => {
+            mark.content.classList.add("animation");
+        });
     }
 
     function updateSheetHeight(height) {
@@ -1987,6 +1982,347 @@
                 window.location.href = redirectUrl;
             });
         }
+    }
+
+    // Versión mejorada con zoom más notorio y debug
+    async function animateMarkerTransition(targetMark, callback) {
+        const transitionZoom = 15;
+        const finalZoom = 17;
+
+        const targetPos = {
+            lat: +targetMark.info.latitud,
+            lng: +targetMark.info.longitud,
+        };
+
+        console.log('=== INICIANDO TRANSICIÓN ===');
+
+        // Preparar el panel del popup ANTES de la animación
+        preparePopupPanel();
+
+        // Iniciar la carga de datos en paralelo
+        const dataPromise = preloadPopupData(
+            targetMark.info.id_cliente,
+            targetMark.info.id_empresa,
+            targetMark.info.Empresa,
+            targetMark.info.direccion,
+            targetMark.info.nombre,
+            targetMark.info.familia
+        );
+
+        try {
+            // Paso 1: Zoom out suave por pasos
+            console.log('Paso 1: Zoom out');
+            await smoothZoomBySteps(map, transitionZoom, 80); // 80ms entre pasos
+
+            // Paso 2: Mover al nuevo punto
+            console.log('Paso 2: Paneo');
+            await smoothPanBySteps(map, targetPos, 15, 50); // 15 pasos, 50ms cada uno
+
+            // Paso 3: Zoom in suave por pasos
+            console.log('Paso 3: Zoom in');
+            await smoothZoomBySteps(map, finalZoom, 80);
+
+            // Esperar datos si aún no están listos
+            console.log('Paso 4: Esperando datos...');
+            const popupContent = await dataPromise;
+
+            // Mostrar el popup
+            displayPopup(popupContent);
+            console.log('=== TRANSICIÓN COMPLETADA ===');
+
+            if (callback) callback();
+        } catch (error) {
+            console.error('Error en animación:', error);
+        }
+    }
+
+    // Función para hacer zoom suave por pasos discretos
+    function smoothZoomBySteps(map, targetZoom, stepDelay) {
+        return new Promise((resolve) => {
+            const currentZoom = map.getZoom();
+            const step = currentZoom < targetZoom ? 0.5 : -0.5; // Pasos de 0.5 niveles
+            let zoom = currentZoom;
+
+            console.log(`Zoom de ${currentZoom} a ${targetZoom}, paso: ${step}`);
+
+            function nextStep() {
+                // Calcular el próximo nivel de zoom
+                if (step > 0 && zoom >= targetZoom) {
+                    map.setZoom(targetZoom);
+                    console.log('Zoom completado:', targetZoom);
+                    resolve();
+                    return;
+                } else if (step < 0 && zoom <= targetZoom) {
+                    map.setZoom(targetZoom);
+                    console.log('Zoom completado:', targetZoom);
+                    resolve();
+                    return;
+                }
+
+                zoom += step;
+                map.setZoom(zoom);
+
+                setTimeout(nextStep, stepDelay);
+            }
+
+            nextStep();
+        });
+    }
+
+    // Función para hacer paneo suave por pasos
+    function smoothPanBySteps(map, targetPos, steps, stepDelay) {
+        return new Promise((resolve) => {
+            const startPos = map.getCenter();
+            const startLat = startPos.lat();
+            const startLng = startPos.lng();
+            const latStep = (targetPos.lat - startLat) / steps;
+            const lngStep = (targetPos.lng - startLng) / steps;
+
+            let currentStep = 0;
+
+            console.log(`Pan de (${startLat.toFixed(4)}, ${startLng.toFixed(4)}) a (${targetPos.lat.toFixed(4)}, ${targetPos.lng.toFixed(4)}) en ${steps} pasos`);
+
+            function nextStep() {
+                if (currentStep >= steps) {
+                    map.setCenter(targetPos);
+                    console.log('Pan completado');
+                    resolve();
+                    return;
+                }
+
+                currentStep++;
+                const newLat = startLat + (latStep * currentStep);
+                const newLng = startLng + (lngStep * currentStep);
+
+                map.setCenter({ lat: newLat, lng: newLng });
+
+                setTimeout(nextStep, stepDelay);
+            }
+
+            nextStep();
+        });
+    }
+
+    // Animar zoom con mejor implementación
+    function animateZoomTo(map, targetZoom, duration) {
+        return new Promise((resolve) => {
+            const startZoom = map.getZoom();
+            const zoomDiff = targetZoom - startZoom;
+
+            console.log('animateZoomTo: de', startZoom, 'a', targetZoom, 'diferencia:', zoomDiff);
+
+            if (Math.abs(zoomDiff) < 0.1) {
+                console.log('Zoom ya está en el nivel target, resolviendo inmediatamente');
+                resolve();
+                return;
+            }
+
+            const startTime = Date.now(); // Usar Date.now() en lugar de performance.now()
+            let frameCount = 0;
+
+            function updateZoom() {
+                frameCount++;
+                const currentTime = Date.now();
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Easing function para suavidad (ease-in-out)
+                const easeProgress = progress < 0.5
+                    ? 2 * progress * progress
+                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+                const newZoom = startZoom + (zoomDiff * easeProgress);
+
+                if (frameCount % 10 === 0) { // Log cada 10 frames
+                    console.log('Zoom frame:', frameCount, 'progress:', progress.toFixed(2), 'zoom:', newZoom.toFixed(2));
+                }
+
+                map.setZoom(newZoom);
+
+                if (progress < 1) {
+                    requestAnimationFrame(updateZoom);
+                } else {
+                    console.log('Zoom completado en', frameCount, 'frames');
+                    resolve();
+                }
+            }
+
+            requestAnimationFrame(updateZoom);
+        });
+    }
+
+    // Animar paneo con mejor implementación
+    function animatePanTo(map, targetPos, duration) {
+        return new Promise((resolve) => {
+            const startPos = map.getCenter();
+            const startLat = startPos.lat();
+            const startLng = startPos.lng();
+            const latDiff = targetPos.lat - startLat;
+            const lngDiff = targetPos.lng - startLng;
+
+            console.log('animatePanTo: de', startLat.toFixed(4), startLng.toFixed(4),
+                        'a', targetPos.lat.toFixed(4), targetPos.lng.toFixed(4));
+
+            if (Math.abs(latDiff) < 0.0001 && Math.abs(lngDiff) < 0.0001) {
+                console.log('Ya está en la posición target, resolviendo inmediatamente');
+                resolve();
+                return;
+            }
+
+            const startTime = Date.now();
+            let frameCount = 0;
+
+            function updatePan() {
+                frameCount++;
+                const currentTime = Date.now();
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Easing function para suavidad (ease-in-out)
+                const easeProgress = progress < 0.5
+                    ? 2 * progress * progress
+                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+                const newLat = startLat + (latDiff * easeProgress);
+                const newLng = startLng + (lngDiff * easeProgress);
+
+                if (frameCount % 10 === 0) { // Log cada 10 frames
+                    console.log('Pan frame:', frameCount, 'progress:', progress.toFixed(2));
+                }
+
+                map.setCenter({ lat: newLat, lng: newLng });
+
+                if (progress < 1) {
+                    requestAnimationFrame(updatePan);
+                } else {
+                    console.log('Pan completado en', frameCount, 'frames');
+                    resolve();
+                }
+            }
+
+            requestAnimationFrame(updatePan);
+        });
+    }
+
+    // Preparar el panel visualmente
+    function preparePopupPanel() {
+        const infoPanel = $('#info-panel');
+
+        if (!movil) {
+            if (navOpened) {
+                document.getElementById("map").style.setProperty('width', 'calc(100% - 400px - 380px)');
+                $('#familias').css('width', 'calc(100dvw - 390px - 420px)');
+                $('#familias').css('justify-content', 'center');
+            } else {
+                document.getElementById("map").style.setProperty('width', 'calc(100% - 380px)');
+                $('#familias').css('width', 'calc(100dvw - 390px)');
+                $('#familias').css('justify-content', 'center');
+            }
+            infoPanel.css('padding', '1.5em 3em 1em');
+            infoPanel.css('width', '380px');
+        } else {
+            infoPanel.css('padding', '3em 3em 1em');
+            infoPanel.css('width', '100dvw');
+            infoPanel.css('height', '40dvh');
+        }
+
+        openInfo = true;
+
+        // Mostrar un loader mientras carga
+        infoPanel.html('<div class="d-flex justify-content-center align-items-center" style="height:200px;"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>');
+    }
+
+    // Pre-cargar los datos del popup
+    function preloadPopupData(id_cliente, id_emp, emp, direccion, nombre, familia) {
+        return new Promise((resolve) => {
+            let logo = "";
+            switch (parseInt(id_emp)) {
+                case 1:
+                    logo = `<svg height="60" viewBox="0 0 131 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g clip-path="url(#clip0_2410_4594)">
+                            <path d="M43.4037 19.8514V18.5264H34.4365L28.9899 37.5648L23.5931 18.5264H18.047L26.4506 43.6075H31.3569L38.2422 23.2241V26.7608C39.1836 24.9372 41.176 21.4642 43.4004 19.8548L43.4037 19.8514Z" fill="#002C53"/>
+                            <path d="M38.2455 36.1662V43.6075H43.4037V31.3514C42.26 32.1076 39.8566 33.8541 38.2455 36.1662Z" fill="#002C53"/>
+                            <path d="M8.87102 18.5264H14.7452L23.5367 43.6075H17.9045L16.2635 38.4515H7.11405L5.43002 43.6075H0L8.87102 18.5264ZM8.52625 34.1285H14.8911L11.7518 24.2614L8.52625 34.1285Z" fill="#002C53"/>
+                            <path d="M118.595 39.0972V18.5264H113.401V39.0972H100.661V32.6463H111.537V28.2932H100.661V22.9665H111.74V18.5264H95.5889V25.2216C95.2507 24.1744 94.7568 23.1873 94.1104 22.2538C93.0297 20.7113 91.6175 19.6507 89.8737 19.0718C88.8494 18.7305 87.5698 18.5499 86.025 18.5298H75.3141V43.6109H86.025C89.7842 43.6109 92.5589 42.0483 94.359 38.9333C94.8629 38.0499 95.2739 37.093 95.5855 36.0658V43.6142H131V39.1039H118.592L118.595 39.0972ZM90.2815 35.5907C89.3135 38.0299 87.603 39.2478 85.1498 39.2478H80.353V22.8828H85.1498C87.5101 22.8828 89.0914 23.5654 89.8837 24.9305C90.6793 26.299 91.0738 28.2564 91.0738 30.8093C91.0738 32.6563 90.8086 34.2523 90.2815 35.5907Z" fill="#002C53"/>
+                            <path d="M75.8876 5.53419C75.8876 5.53419 72.3505 10.8341 65.6641 8.47192C61.5137 6.27364 65.0906 2.9344 65.8663 2.27191C66.8277 1.45216 70.9416 -1.15098 72.8246 0.588905C73.3284 1.05399 73.7362 1.65626 70.6897 4.29285C69.2377 5.58438 71.0444 7.32427 73.9749 5.7751C76.8987 4.23263 75.891 5.53754 75.891 5.53754L75.8876 5.53419Z" fill="#B1B3B4"/>
+                            <path d="M80.3894 9.27828C80.3894 9.27828 73.6003 15.1838 79.3518 16.9672C81.3607 17.5862 83.2337 16.1475 83.5951 15.7493C84.9178 14.3005 83.9763 10.456 80.7342 12.8752C79.9287 13.4741 78.9673 12.9789 79.4977 12.1558C82.2658 7.86295 80.3894 9.27493 80.3894 9.27493V9.27828Z" fill="#B1B3B4"/>
+                            <path d="M52.5962 43.9856C52.5962 43.9856 54.2703 45.2136 57.4693 43.4837C61.0032 41.5765 69.1382 35.5739 71.7836 26.9113C74.3594 18.4595 73.3881 13.5376 81.2215 6.96286C81.2215 6.96286 81.8481 6.31041 80.2204 6.13976C78.7352 6.09961 75.1948 6.6818 70.6333 11.9583C70.6333 11.9583 68.2995 14.779 67.2851 19.5369C66.3404 23.9669 66.1414 26.7808 64.4541 30.6521C59.0605 43.032 52.5929 43.9856 52.5929 43.9856H52.5962Z" fill="#B1B3B4"/>
+                            <path d="M50.3984 15.7727C52.5797 14.6251 55.6096 13.9559 57.7246 14.4578C65.1171 16.2144 63.7911 24.2245 62.7038 28.4036C61.8617 31.6324 60.0352 35.3263 57.6019 37.9161C55.1753 40.5025 53.372 42.3863 48.9066 43.3934L48.595 43.1759C48.595 43.1759 53.1134 39.8902 54.8007 37.712C56.4848 35.5338 60.1943 29.1765 55.7886 25.8072C54.9532 25.1714 54.0648 24.8201 51.4691 25.4358C48.9663 26.0313 45.9927 27.5705 40.619 32.2113C38.8356 33.7471 36.3858 36.4372 35.5238 37.2134C35.5238 37.2134 40.3041 25.5161 51.0083 21.5378C51.0083 21.5378 47.0999 20.0789 39.0809 27.9519C39.0809 27.9519 40.745 20.8485 50.3951 15.7694L50.3984 15.7727Z" fill="#B1B3B4"/>
+                            </g></svg>`;
+                    break;
+                case 2:
+                    logo = `<svg xmlns="http://www.w3.org/2000/svg" height="60" viewBox="29.39 355.295 537.1 133.3"><!-- SVG case 2 --></svg>`;
+                    break;
+                case 3:
+                    logo = `<svg xmlns="http://www.w3.org/2000/svg" height="60" viewBox="77.3697 355.96 441.2 130.9"><!-- SVG case 3 --></svg>`;
+                    break;
+                case 4:
+                    logo = `<svg xmlns="http://www.w3.org/2000/svg" height="60" viewBox="211.236 57.37 1181 623.5"><!-- SVG case 4 --></svg>`;
+                    break;
+                default:
+                    logo = `<svg xmlns="http://www.w3.org/2000/svg" height="60" viewBox="183.96 485.28 227.9 100.3"><!-- SVG default --></svg>`;
+                    break;
+            }
+
+            let fam = familia.split(',');
+            let familias = "";
+            fam.forEach(element => {
+                familias += '<div class="fam-pills selected d-flex gap-1 align-items-center" onclick="filterProducts(this)"><div class="fam_filter">' + element + '</div><span class="fam-pills-info selected">&check;</span></div>';
+            });
+
+            let content =
+                '<div class="drag-icon"><span></span></div><div class="closePopUpButton" onclick="closePopupButton()"><span>X</span></div> <div class="popup-datos"><div>' +
+                logo + '</div><h2 class="mt-5">' + nombre + '</h2><div class="d-flex gap-1 align-items-center"><div><span style="border:1px solid #003B71;padding:8px;border-radius:50%"><svg height="24" viewBox="0 0 12 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path id="location_on" d="M6.00133 7.89552C6.37446 7.89552 6.69346 7.76265 6.95833 7.49689C7.22333 7.23114 7.35583 6.91171 7.35583 6.53858C7.35583 6.16546 7.22296 5.8464 6.95721 5.58139C6.69146 5.31652 6.37196 5.18408 5.99871 5.18408C5.62558 5.18408 5.30658 5.31696 5.04171 5.58271C4.77671 5.84846 4.64421 6.16796 4.64421 6.54121C4.64421 6.91433 4.77708 7.23333 5.04283 7.49821C5.30858 7.76308 5.62808 7.89552 6.00133 7.89552ZM6.00002 13.6317C7.46727 12.3182 8.59008 11.0583 9.36846 9.85208C10.1468 8.64583 10.536 7.58933 10.536 6.68258C10.536 5.31533 10.1016 4.19133 9.23289 3.31058C8.36414 2.42983 7.28652 1.98946 6.00002 1.98946C4.71352 1.98946 3.63589 2.42983 2.76714 3.31058C1.89839 4.19133 1.46402 5.31533 1.46402 6.68258C1.46402 7.58933 1.85321 8.64583 2.63158 9.85208C3.40996 11.0583 4.53277 12.3182 6.00002 13.6317ZM6.00002 15.1287C4.11252 13.4932 2.69714 11.9711 1.75389 10.5625C0.810645 9.15377 0.33902 7.86046 0.33902 6.68258C0.33902 4.95183 0.898832 3.55064 2.01846 2.47902C3.13821 1.40739 4.46539 0.871582 6.00002 0.871582C7.53464 0.871582 8.86183 1.40739 9.98158 2.47902C11.1012 3.55064 11.661 4.95183 11.661 6.68258C11.661 7.86046 11.1894 9.15377 10.2461 10.5625C9.30289 11.9711 7.88752 13.4932 6.00002 15.1287Z" fill="#003B71"/></svg></span></div><p class="p-0 m-0" style="font-size: 1rem;line-height: 150%;">' + direccion +
+                '</p></div><div class="popup-prods"><h3 class="mt-4 pb-1 mb-3" style="color:#003B71; border-bottom:1px solid">Productos</h3><div id="fam_'+id_cliente+'" style="display:flex !important" class="d-flex gap-1 flex-wrap">'+familias+'</div><ul id="ul_' +
+                id_cliente + '" class="mt-4" style="max-height:310px;overflow-y:auto"></ul></div>';
+
+            // Cargar productos con AJAX
+            if (xhr != null) {
+                xhr.abort();
+            }
+
+            xhr = $.ajax({
+                url: "{{ route('getClientProdsLocation') }}",
+                type: 'GET',
+                dataType: "json",
+                data: {
+                    id_empresa: id_emp,
+                    id_cliente: id_cliente
+                },
+                success: function(response) {
+                    let prods = "";
+                    if (response.length == 0) {
+                        prods = '<li>No hay productos</li>';
+                    } else {
+                        response.forEach(element => {
+                            prods += `<li class="prod_fam prod_fam_${element.familia}">${element.name_cons}</li>`;
+                        });
+                    }
+
+                    // Crear el contenido final con los productos
+                    const finalContent = {
+                        html: content,
+                        products: prods,
+                        id_cliente: id_cliente
+                    };
+
+                    resolve(finalContent);
+                },
+                error: function() {
+                    resolve({
+                        html: content,
+                        products: '<li>Error al cargar productos</li>',
+                        id_cliente: id_cliente
+                    });
+                }
+            });
+        });
+    }
+
+    // Mostrar el popup ya cargado
+    function displayPopup(popupContent) {
+        $('#info-panel').html(popupContent.html);
+        $('#ul_' + popupContent.id_cliente).html(popupContent.products);
     }
 
 </script>
